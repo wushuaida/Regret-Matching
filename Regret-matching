@@ -1,0 +1,76 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Jan  2 14:45:52 2020
+
+@author: Dawen Wu
+"""
+
+import numpy as np
+
+T = 5000000
+player_set = [0,1]
+mu = 2*1000*(4-1)*1.3
+strategy_set = [(i,j) for i in range(3) for j in range(4)]
+action_sets = [[0,1,2],[0,1,2,3]]
+
+player_0_payoff = np.random.uniform(-1000,1000,(3,4))
+player_1_payoff = np.random.uniform(-1000,1000,(3,4))
+payoff = np.array([player_0_payoff, player_1_payoff])
+
+initial_distribution_0 = np.array([0.3,0.3,0.4])
+initial_distribution_1 = np.array([0.3,0.3,0.3,0.1])
+distribution = np.array([initial_distribution_0,initial_distribution_1])
+
+regret_matrix_0 = np.zeros((3,3))
+regret_matrix_1 = np.zeros((4,4))
+regret_matrix = np.array([regret_matrix_0, regret_matrix_1])
+
+def u(player, s_0, s_1):
+    return payoff[player, s_0, s_1]
+
+record = []
+p_0 = distribution[0]
+p_1 = distribution[1]
+for t in range(1,T+1):
+    s_0, s_1 = np.random.choice(3, p=distribution[0]), np.random.choice(4, p=distribution[1])
+    s = np.array([s_0, s_1])
+    record.append(s)
+    for player in player_set:
+        u_i = u(player, s_0, s_1)
+        
+        if player == 0:
+            j = s_0
+            regret_matrix[player][s[player],:] += payoff[player, :, s_1] - u_i
+        else :
+            j = s_1
+            regret_matrix[player][s[player],:] += payoff[player, s_0, :] - u_i
+        regret_matrix[player][s[player],:] = np.clip(regret_matrix[player][s[player],:], 0, None)
+        
+        distribution[player] = (1/mu)*(1/t)*regret_matrix[player][s[player],:]
+        distribution[player][j] = 1 - np.sum(distribution[player])
+        
+
+unique, counts = np.unique(record, return_counts = True, axis = 0)
+counts = counts/counts.sum()
+record_distribution = dict()
+for i in range(len(unique)):
+    record_distribution[tuple(unique[i])] = counts[i]
+for strategy in strategy_set:
+    if strategy not in record_distribution.keys():record_distribution[strategy] = 0
+
+
+def correlated_equilibrium_checker(record_distribution):
+    lis = []
+    for player in player_set:
+        for j in action_sets[player]:
+            for k in action_sets[player]:
+                s = 0
+                for strategy in strategy_set:
+                    if strategy[player] == j:
+                        if player == 0: s_0, s_1= k, strategy[1]
+                        else : s_0, s_1= strategy[0], k
+                        s += record_distribution[strategy]*(u(player, s_0, s_1) - u(player,*strategy ))
+                lis.append(s)
+    return lis
+
+correlated_equilibrium_checker(record_distribution)
